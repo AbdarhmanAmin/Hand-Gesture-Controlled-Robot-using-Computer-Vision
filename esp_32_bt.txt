@@ -1,0 +1,193 @@
+#include "Arduino.h"
+#include "BluetoothSerial.h"
+
+// Check if Bluetooth is available
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to enable it
+#endif
+
+// Motor control pins (adjust according to your ESP32-CAM wiring)
+int IN1 = 12;
+int IN2 = 13;
+int IN3 = 14;
+int IN4 = 15;
+
+// Status LED (built-in LED on some ESP32-CAM boards is GPIO 33)
+int STATUS_LED = 33;
+
+// Variables for command processing
+char singleCharCommand = '\0';
+bool isMoving = false;
+
+// Bluetooth Serial object
+BluetoothSerial SerialBT;
+
+// Device name (you can change this)
+const char* deviceName = "ESP32-CAM Robot";
+
+// Connection callback function
+void btCallback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
+  if (event == ESP_SPP_SRV_OPEN_EVT) {
+    Serial.println("Bluetooth Client Connected!");
+    digitalWrite(STATUS_LED, HIGH);
+    // Small delay before sending welcome message
+    delay(50);
+    SerialBT.println("ESP32-CAM ROBOT CONNECTED");
+    SerialBT.println("Commands: F=Forward, B=Back, L=Left, R=Right, S=Stop");
+  }
+  
+  if (event == ESP_SPP_CLOSE_EVT) {
+    Serial.println("Bluetooth Client Disconnected!");
+    digitalWrite(STATUS_LED, LOW);
+    stopMotors();
+    isMoving = false;
+  }
+}
+
+void setup() {
+  // Initialize Serial for debugging
+  Serial.begin(115200);
+  delay(1000); // Give serial time to initialize
+  
+  Serial.println("\n\n=====================================");
+  Serial.println("ESP32-CAM ROBOT CONTROLLER");
+  Serial.println("=====================================");
+  
+  // Initialize motor control pins
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  // Initialize status LED
+  pinMode(STATUS_LED, OUTPUT);
+  digitalWrite(STATUS_LED, LOW);
+
+  // Stop motors initially
+  stopMotors();
+
+  // Blink LED to indicate startup
+  for (int i = 0; i <= 3; i++) {
+    digitalWrite(STATUS_LED, HIGH);
+    delay(150);
+    digitalWrite(STATUS_LED, LOW);
+    delay(150);
+  }
+
+  // Initialize Bluetooth Serial with callback
+  delay(2000);
+  // SerialBT.register_callback(btCallback);
+  SerialBT.begin(deviceName);
+
+  delay(1000);
+  
+  Serial.println("Bluetooth Started Successfully!");
+  Serial.print("Device Name: ");
+  Serial.println(deviceName);
+  Serial.println("Waiting for Bluetooth connection...");
+  Serial.println("=====================================\n");
+
+  // Slow blink while waiting for connection
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(STATUS_LED, HIGH);
+    delay(200);
+    digitalWrite(STATUS_LED, LOW);
+    delay(700);
+  }
+}
+
+void loop() {
+  // Read from Bluetooth Serial if connected
+  if (SerialBT.available()) {
+    char incomingChar = SerialBT.read();
+    
+    // Print to Serial Monitor for debugging
+    Serial.print("BT Received: ");
+    Serial.println(incomingChar);
+    
+    processCharCommand(incomingChar);
+    singleCharCommand = incomingChar;
+    
+    digitalWrite(STATUS_LED, HIGH); // LED on when receiving data
+  }
+
+  // Small delay to prevent watchdog issues
+  delay(10);
+}
+
+void processCharCommand(char command) {
+  Serial.print("Executing command: ");
+  Serial.println(command);
+  
+  switch (command) {
+    case 'F': 
+      moveForward(); 
+      Serial.println("Moving FORWARD...");
+      break;
+    case 'B': 
+      moveBackward(); 
+      Serial.println("Moving BACKWARD...");
+      break;
+    case 'L': 
+      turnLeft(); 
+      Serial.println("Moving LEFT...");
+      break;
+    case 'R': 
+      turnRight(); 
+      Serial.println("Moving RIGHT...");
+      break;
+    case 'N': 
+      stopMotors(); 
+      Serial.println("STOP!");
+      break;
+    default: 
+      stopMotors(); 
+      Serial.println("STOP!");
+      break;
+  }
+}
+
+// Motor control functions
+void moveForward() { 
+  digitalWrite(IN1, HIGH); 
+  digitalWrite(IN2, LOW); 
+  digitalWrite(IN3, HIGH); 
+  digitalWrite(IN4, LOW); 
+  isMoving = true; 
+  digitalWrite(STATUS_LED, HIGH);
+}
+
+void moveBackward() { 
+  digitalWrite(IN1, LOW); 
+  digitalWrite(IN2, HIGH); 
+  digitalWrite(IN3, LOW); 
+  digitalWrite(IN4, HIGH); 
+  isMoving = true; 
+  digitalWrite(STATUS_LED, HIGH);
+}
+
+void turnRight() { 
+  digitalWrite(IN1, HIGH); 
+  digitalWrite(IN2, LOW); 
+  digitalWrite(IN3, LOW); 
+  digitalWrite(IN4, HIGH); 
+  isMoving = true; 
+  digitalWrite(STATUS_LED, HIGH);
+}
+
+void turnLeft() { 
+  digitalWrite(IN1, LOW); 
+  digitalWrite(IN2, HIGH); 
+  digitalWrite(IN3, HIGH); 
+  digitalWrite(IN4, LOW); 
+  isMoving = true; 
+  digitalWrite(STATUS_LED, HIGH);
+}
+
+void stopMotors() { 
+  digitalWrite(IN1, LOW); 
+  digitalWrite(IN2, LOW); 
+  digitalWrite(IN3, LOW); 
+  digitalWrite(IN4, LOW); 
+  isMoving = false; 
+}
